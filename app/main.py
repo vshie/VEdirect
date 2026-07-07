@@ -127,6 +127,6 @@ async def api_history(minutes: float = 20.0):
 @app.get("/api/download/csv")
 async def api_download_csv():
     path = csv_path_for_download(ensure_data_dir())
-    if not path.is_file():
+    if path is None or not path.is_file():
         raise HTTPException(status_code=404, detail="No CSV yet")
-    return FileResponse(path, filename="vedirect_log.csv", media_type="text/csv")
+    return FileResponse(path, filename=path.name, media_type="text/csv")

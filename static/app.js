@@ -347,10 +347,29 @@ function wireCsvDownloadLink() {
   if (a) a.href = apiUrl("api/download/csv");
 }
 
+/** Embed the BlueOS File Browser (port 7777) scoped to this extension's data dir. */
+function wireFileBrowser() {
+  const iframe = $("#file-browser");
+  const link = $("#fb-link");
+  const fallback = $("#fb-fallback");
+  // /usr/blueos/extensions/vedirect is bound to /data, and BlueOS serves it at
+  // :7777/files/extensions/vedirect (same convention other extensions use).
+  const url = `${location.protocol}//${location.hostname}:7777/files/extensions/vedirect`;
+  if (iframe) iframe.src = url;
+  if (link) link.href = url;
+  // If it can't load (e.g. dev/local, no BlueOS core), reveal the direct link.
+  if (iframe && fallback) {
+    let loaded = false;
+    iframe.addEventListener("load", () => { loaded = true; });
+    setTimeout(() => { if (!loaded) fallback.classList.remove("hidden"); }, 4000);
+  }
+}
+
 async function boot() {
   tabInit();
   settingsInit();
   wireCsvDownloadLink();
+  wireFileBrowser();
   await loadSettingsForm();
   await chartControlsInit();
   refreshStatus();

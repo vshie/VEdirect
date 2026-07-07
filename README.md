@@ -12,9 +12,12 @@ dual-y-axis chart (defaulting to **load current** and **solar power**).
 
 - **VE.Direct text-protocol parser** with checksum validation, tolerant of the
   HEX protocol frames some devices interleave.
-- **CSV logging** of all decoded fields (`/data/vedirect_log.csv`), with any
-  unrecognised labels preserved verbatim in an `extra_json` column so nothing is
-  ever dropped.
+- **CSV logging** of all decoded fields, with any unrecognised labels preserved
+  verbatim in an `extra_json` column so nothing is ever dropped. Logs **rotate
+  weekly** — a new file `vedirect_<ISO-year>-W<week>.csv` (e.g.
+  `vedirect_2026-W27.csv`) is started each ISO week under `/data`.
+- **Embedded file browser** in the GUI (the BlueOS File Browser on port 7777,
+  scoped to this extension's data folder) to view and download any weekly log.
 - **MAVLink telemetry** to the autopilot. Each metric is sent on its own
   `component_id` (base + offset) so mavlink-server does not overwrite them:
 
@@ -136,8 +139,8 @@ other than `/dev/ttyUSB0`, change it in the extension's **Settings** tab.
 | `/api/status`        | GET    | Connection state + latest decoded values     |
 | `/api/metrics`       | GET    | Numeric columns available for charting        |
 | `/api/settings`      | GET/PUT| Read / update settings                       |
-| `/api/history`       | GET    | Recent CSV rows (`?minutes=`)                |
-| `/api/download/csv`  | GET    | Download the full CSV log                    |
+| `/api/history`       | GET    | Recent CSV rows (`?minutes=`), across weekly files |
+| `/api/download/csv`  | GET    | Download the current (newest) weekly CSV     |
 
 ## License
 

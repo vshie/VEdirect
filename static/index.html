@@ -116,7 +116,21 @@
           <div class="chart-wrap">
             <canvas id="chart" height="200"></canvas>
           </div>
-          <p class="small"><a id="csv-dl" href="api/download/csv">Download full CSV log</a></p>
+          <p class="small"><a id="csv-dl" href="api/download/csv">Download current week's CSV</a></p>
+        </section>
+
+        <section class="card fb-block" aria-labelledby="fb-heading">
+          <div class="fb-head">
+            <h2 id="fb-heading" class="chart-title">Log files</h2>
+            <p class="small muted">A new CSV is started each week. Browse and download past logs here.</p>
+          </div>
+          <div class="fb-wrap">
+            <iframe id="file-browser" title="BlueOS File Browser" loading="lazy"></iframe>
+            <p id="fb-fallback" class="small muted fb-fallback hidden">
+              File browser unavailable. Open it directly at
+              <a id="fb-link" href="#" target="_blank" rel="noopener">the BlueOS File Browser</a>.
+            </p>
+          </div>
         </section>
       </section>
 

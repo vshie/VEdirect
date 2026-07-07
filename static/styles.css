@@ -175,8 +175,22 @@ button.primary {
 }
 button.primary:hover { filter: brightness(1.06); }
 
+.fb-block { margin-top: 16px; }
+.fb-head { margin-bottom: 12px; }
+.fb-head .chart-title { margin: 0 0 2px; font-size: 16px; }
+.fb-wrap { position: relative; }
+#file-browser {
+  width: 100%;
+  height: 480px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.fb-fallback { margin-top: 8px; }
+
 .small { font-size: 13px; }
 .muted { color: var(--muted); }
+.hidden { display: none; }
 a { color: var(--accent); }
 
 @media (max-width: 620px) {
