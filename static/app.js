@@ -34,6 +34,7 @@ const METRIC_LABELS = {
   pv_voltage_V: "PV voltage (V)",
   pv_power_W: "PV power (W)",
   load_current_A: "Load current (A)",
+  load_power_W: "Load power (W)",
   charge_state_code: "Charge state",
   mppt_state_code: "Tracker state",
   error_code: "Error code",
@@ -42,6 +43,23 @@ const METRIC_LABELS = {
   max_power_today_W: "Max power today (W)",
   battery_temp_C: "Battery temp (°C)",
 };
+
+// Metrics the controller doesn't send but we derive from logged columns, so no
+// extra logging is needed to chart them.
+const COMPUTED_METRICS = {
+  load_power_W: (row) => {
+    const bv = Number(row.battery_voltage_V);
+    const la = Number(row.load_current_A);
+    return Number.isFinite(bv) && Number.isFinite(la) ? bv * la : null;
+  },
+};
+
+/** Read a chart metric from a history row, resolving derived metrics. */
+function metricValue(row, key) {
+  if (COMPUTED_METRICS[key]) return COMPUTED_METRICS[key](row);
+  const v = row[key];
+  return v === "" || v == null ? null : Number(v);
+}
 
 const CHARGE_STATES = {
   0: "Off", 1: "Low power", 2: "Fault", 3: "Bulk", 4: "Absorption",
@@ -177,10 +195,8 @@ async function loadChart() {
     const d = parseTS(p);
     if (!d) continue;
     labels.push(d.toLocaleTimeString());
-    const lv = p[chartLeft];
-    const rv = p[chartRight];
-    left.push(lv === "" || lv == null ? null : Number(lv));
-    right.push(rv === "" || rv == null ? null : Number(rv));
+    left.push(metricValue(p, chartLeft));
+    right.push(metricValue(p, chartRight));
   }
 
   const data = {
@@ -258,6 +274,8 @@ async function chartControlsInit() {
     const m = await fetchJSON("api/metrics");
     if (Array.isArray(m.numeric_columns) && m.numeric_columns.length) columns = m.numeric_columns;
   } catch (_) { /* use fallback */ }
+  // Offer derived metrics (e.g. load power) alongside the logged columns.
+  columns = columns.concat(Object.keys(COMPUTED_METRICS).filter((k) => !columns.includes(k)));
 
   const leftSel = $("#chart-left");
   const rightSel = $("#chart-right");
