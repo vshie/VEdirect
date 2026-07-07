@@ -1,0 +1,13 @@
+services:
+  vedirect:
+    build: .
+    ports:
+      - "8080:80"
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data
+      - /dev:/dev
+    privileged: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

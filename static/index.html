@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Victron VE.Direct Monitor</title>
+  <!-- Sync: <base> from this script URL when location.pathname is "/" (BlueOS iframe). -->
+  <script src="static/init-base.js"></script>
+  <link rel="stylesheet" href="static/styles.css" />
+  <script src="static/vendor/chart.umd.min.js" defer></script>
+  <script src="static/app.js" defer></script>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <h1>Victron VE.Direct Monitor</h1>
+      <div class="conn">
+        <span id="conn-dot" class="dot"></span>
+        <span id="conn-text" class="conn-text">Connecting…</span>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button type="button" class="tab active" data-tab="dash">Dashboard</button>
+      <button type="button" class="tab" data-tab="settings">Settings</button>
+    </nav>
+
+    <main class="main-inner">
+      <section id="panel-dash" class="panel active">
+        <div class="cards" id="cards">
+          <div class="card metric-card accent-solar">
+            <span class="card-label">PV Power</span>
+            <span class="card-value" id="c-pv-power">—</span>
+            <span class="card-unit">W</span>
+          </div>
+          <div class="card metric-card accent-solar">
+            <span class="card-label">PV Voltage</span>
+            <span class="card-value" id="c-pv-voltage">—</span>
+            <span class="card-unit">V</span>
+          </div>
+          <div class="card metric-card accent-batt">
+            <span class="card-label">Battery Voltage</span>
+            <span class="card-value" id="c-batt-voltage">—</span>
+            <span class="card-unit">V</span>
+          </div>
+          <div class="card metric-card accent-batt">
+            <span class="card-label">Battery Current</span>
+            <span class="card-value" id="c-batt-current">—</span>
+            <span class="card-unit">A</span>
+          </div>
+          <div class="card metric-card accent-load">
+            <span class="card-label">Load Current</span>
+            <span class="card-value" id="c-load-current">—</span>
+            <span class="card-unit">A</span>
+          </div>
+          <div class="card metric-card accent-load">
+            <span class="card-label">Load Output</span>
+            <span class="card-value" id="c-load-state">—</span>
+            <span class="card-unit">&nbsp;</span>
+          </div>
+          <div class="card metric-card">
+            <span class="card-label">Charge State</span>
+            <span class="card-value small-value" id="c-charge-state">—</span>
+            <span class="card-unit">&nbsp;</span>
+          </div>
+          <div class="card metric-card">
+            <span class="card-label">Tracker</span>
+            <span class="card-value small-value" id="c-mppt-state">—</span>
+            <span class="card-unit">&nbsp;</span>
+          </div>
+          <div class="card metric-card">
+            <span class="card-label">Yield Today</span>
+            <span class="card-value" id="c-yield-today">—</span>
+            <span class="card-unit">kWh</span>
+          </div>
+          <div class="card metric-card">
+            <span class="card-label">Max Power Today</span>
+            <span class="card-value" id="c-max-today">—</span>
+            <span class="card-unit">W</span>
+          </div>
+          <div class="card metric-card">
+            <span class="card-label">Yield Total</span>
+            <span class="card-value" id="c-yield-total">—</span>
+            <span class="card-unit">kWh</span>
+          </div>
+          <div class="card metric-card">
+            <span class="card-label">Error</span>
+            <span class="card-value small-value" id="c-error">—</span>
+            <span class="card-unit">&nbsp;</span>
+          </div>
+        </div>
+
+        <p id="status-line" class="small muted status-line">—</p>
+
+        <section class="chart-block card" aria-labelledby="chart-heading">
+          <div class="chart-head">
+            <h2 id="chart-heading" class="chart-title">History</h2>
+            <div class="chart-controls">
+              <label>Left axis
+                <select id="chart-left"></select>
+              </label>
+              <label>Right axis
+                <select id="chart-right"></select>
+              </label>
+              <label>Window
+                <select id="chart-window">
+                  <option value="5">5 min</option>
+                  <option value="20" selected>20 min</option>
+                  <option value="60">1 hour</option>
+                  <option value="180">3 hours</option>
+                  <option value="720">12 hours</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chart" height="200"></canvas>
+          </div>
+          <p class="small"><a id="csv-dl" href="api/download/csv">Download full CSV log</a></p>
+        </section>
+      </section>
+
+      <section id="panel-settings" class="panel">
+        <form id="settings-form" class="form-grid">
+          <fieldset>
+            <legend>Serial / VE.Direct</legend>
+            <label>Serial port <input name="serial_port" type="text" placeholder="/dev/ttyUSB0" /></label>
+            <label>Baud rate <input name="baud_rate" type="number" min="1200" max="230400" /></label>
+            <label>Poll interval (s)
+              <input name="poll_interval_s" type="number" step="0.1" min="0.2" max="60" />
+              <span class="hint">How often a CSV row is written and metrics are pushed to the autopilot.</span>
+            </label>
+            <label>Stale after (s)
+              <input name="stale_after_s" type="number" step="1" min="1" max="300" />
+              <span class="hint">Data older than this is treated as disconnected.</span>
+            </label>
+          </fieldset>
+          <fieldset>
+            <legend>mavlink2rest</legend>
+            <label class="full">POST URL (NamedValueFloat)
+              <input name="mavlink_rest_post_url" type="url" />
+            </label>
+            <label class="check"><input name="mavlink_enabled" type="checkbox" /> Push metrics to autopilot</label>
+            <label class="check"><input name="emit_heartbeat" type="checkbox" /> Emit VE_OK heartbeat every cycle</label>
+            <label>Header system ID <input name="mavlink_header_system_id" type="number" min="1" max="255" /></label>
+            <label title="Base component_id for our NAMED_VALUE_FLOATs. Each metric occupies base + offset: VE_PV_V=base+0, VE_PV_W=base+1, VE_LOAD_A=base+2, VE_BAT_V=base+3, VE_BAT_A=base+4, VE_OK=base+5. Default 70 avoids ranges used by other BlueOS extensions.">Component ID base <input name="mavlink_header_component_id" type="number" min="0" max="249" /></label>
+            <span class="hint full">Published names: <code>VE_PV_V</code> (V), <code>VE_PV_W</code> (W), <code>VE_LOAD_A</code> (A), <code>VE_BAT_V</code> (V), <code>VE_BAT_A</code> (A), <code>VE_OK</code>.</span>
+          </fieldset>
+          <div class="actions full">
+            <button type="submit" class="primary">Save settings</button>
+            <span id="save-msg" class="muted"></span>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
