@@ -82,13 +82,51 @@ The image is published as `<docker-username>/blueos-vedirect`.
 
 ## Manual install on BlueOS
 
-In **Extensions → Installed → +**, enter:
+Open BlueOS → **Extensions** → **Installed** tab → **+** (bottom right) and fill
+in the form exactly as below.
 
-- **Docker image**: `<docker-username>/blueos-vedirect`
-- **Docker tag**: `main` (or a released version)
-- **Custom settings**: the JSON from the `permissions` LABEL in the `Dockerfile`
-  (privileged, `/dev:/dev` bind for the serial port, and a `/data` bind for the
-  persistent CSV + settings).
+| Field                   | Value                                  |
+|-------------------------|----------------------------------------|
+| **Extension Identifier**| `vshie.vedirect`                       |
+| **Extension Name**      | `Victron VE.Direct Monitor`            |
+| **Docker image**        | `vshie/blueos-vedirect`                |
+| **Docker tag**          | `main`                                 |
+
+> The Docker image is `<DOCKER_USERNAME>/blueos-vedirect`, where `DOCKER_USERNAME`
+> is the Docker Hub account configured in the build workflow. For this repo that
+> is `vshie`, giving `vshie/blueos-vedirect`. Use a released version tag (e.g.
+> `1.0.0`) instead of `main` once you tag a release.
+
+**Custom settings** — paste this JSON verbatim (privileged access + `/dev` bind
+for the serial port, and a `/data` bind for the persistent CSV log and
+`settings.json`):
+
+```json
+{
+  "ExposedPorts": {
+    "80/tcp": {}
+  },
+  "HostConfig": {
+    "Privileged": true,
+    "ExtraHosts": ["host.docker.internal:host-gateway"],
+    "PortBindings": {
+      "80/tcp": [
+        {
+          "HostPort": ""
+        }
+      ]
+    },
+    "Binds": [
+      "/usr/blueos/extensions/vedirect:/data",
+      "/dev:/dev"
+    ]
+  }
+}
+```
+
+After it installs and starts, the extension appears in the BlueOS sidebar as
+**Victron VE.Direct Monitor**. If your VE.Direct cable enumerates as something
+other than `/dev/ttyUSB0`, change it in the extension's **Settings** tab.
 
 ## API
 
