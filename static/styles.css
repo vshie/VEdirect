@@ -93,7 +93,6 @@ body {
 .card-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .card-value { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .card-value.small-value { font-size: 18px; }
-.card-value.err-active { color: var(--bad); }
 .card-unit { font-size: 12px; color: var(--muted); }
 
 .status-line { margin: 4px 2px 18px; }

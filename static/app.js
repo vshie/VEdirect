@@ -134,14 +134,12 @@ async function refreshStatus() {
     setCard("#c-charge-state", cs != null && cs !== "" ? (CHARGE_STATES[cs] || `Code ${cs}`) : "—");
     const mppt = d.mppt_state_code;
     setCard("#c-mppt-state", mppt != null && mppt !== "" ? (MPPT_STATES[mppt] || `Code ${mppt}`) : "—");
-    const err = d.error_code;
-    const errEl = $("#c-error");
-    if (errEl) {
-      errEl.textContent = err != null && err !== "" ? (ERROR_CODES[err] || `Code ${err}`) : "—";
-      errEl.classList.toggle("err-active", Number(err) > 0);
-    }
 
     const parts = [];
+    const err = d.error_code;
+    if (err != null && err !== "" && Number(err) > 0) {
+      parts.push(`Controller error: ${ERROR_CODES[err] || `code ${err}`}`);
+    }
     if (s.last_csv_error) parts.push(`CSV: ${s.last_csv_error}`);
     const me = s.last_mavlink_errors || [];
     if (me.length) parts.push(`MAVLink: ${me.join(" · ")}`);
