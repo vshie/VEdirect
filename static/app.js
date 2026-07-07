@@ -119,6 +119,12 @@ async function refreshStatus() {
     setCard("#c-batt-voltage", fmtNum(d.battery_voltage_V, 2));
     setCard("#c-batt-current", fmtNum(d.battery_current_A, 2));
     setCard("#c-load-current", fmtNum(d.load_current_A, 2));
+    // Load power is not sent by the controller; derive it from the battery
+    // voltage and the load output current (the load draws from the battery).
+    const bv = Number(d.battery_voltage_V);
+    const la = Number(d.load_current_A);
+    const loadW = Number.isFinite(bv) && Number.isFinite(la) ? bv * la : null;
+    setCard("#c-load-power", loadW == null ? "—" : loadW.toFixed(1));
     setCard("#c-load-state", d.load_state != null ? d.load_state : "—");
     setCard("#c-yield-today", fmtNum(d.yield_today_kWh, 2));
     setCard("#c-max-today", fmtNum(d.max_power_today_W, 0));
