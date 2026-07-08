@@ -119,8 +119,11 @@ async def api_put_settings(body: dict[str, Any] = Body(...)):
 
 
 @app.get("/api/history")
-async def api_history(minutes: float = 20.0):
-    rows = read_history(ensure_data_dir(), minutes=minutes)
+async def api_history(minutes: float = 20.0, max_points: int = 1500):
+    # Clamp to keep a single request from returning an unbounded payload.
+    minutes = max(1.0, min(float(minutes), 60.0 * 24.0 * 14.0))
+    max_points = max(50, min(int(max_points), 5000))
+    rows = read_history(ensure_data_dir(), minutes=minutes, max_points=max_points)
     return {"minutes": minutes, "points": rows}
 
 

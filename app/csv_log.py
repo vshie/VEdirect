@@ -18,9 +18,12 @@ CSV_FIELDS: list[str] = (
 
 # Logs rotate weekly. File names embed the ISO year + week (zero-padded), so a
 # plain lexicographic sort is chronological, including across year boundaries
-# (e.g. "vedirect_2026-W52.csv" < "vedirect_2027-W01.csv").
+# (e.g. "vedirect_2026-W52.csv" < "vedirect_2027-W01.csv"). The glob is
+# restricted to the dated pattern so unrelated files (e.g. a legacy
+# "vedirect_log.csv" from before rotation) are not swept into history reads,
+# where they would sort out of order and be parsed needlessly.
 _FILE_PREFIX = "vedirect_"
-_FILE_GLOB = f"{_FILE_PREFIX}*.csv"
+_FILE_GLOB = f"{_FILE_PREFIX}[0-9][0-9][0-9][0-9]-W[0-9][0-9].csv"
 
 
 def _weekly_path(data_dir: Path, dt: datetime) -> Path:
@@ -64,36 +67,78 @@ def append_row(data_dir: Path, row: dict[str, Any]) -> None:
             w.writerow(line)
 
 
-def _read_file_rows(path: Path) -> list[dict[str, Any]]:
-    with path.open("r", newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+# Upper bound on points returned by read_history. A long window (e.g. 12 h at
+# 1 Hz ≈ 43k rows) would otherwise return a huge payload that both pegs the CPU
+# on every poll and overwhelms the browser chart. We decimate to at most this
+# many evenly spaced points; the chart doesn't need finer resolution.
+DEFAULT_MAX_POINTS = 1500
 
 
-def read_history(data_dir: Path, minutes: float = 20.0) -> list[dict[str, Any]]:
-    """Return rows from the last `minutes`, spanning weekly files as needed.
+def _ts_of_line(line: str) -> float | None:
+    """Parse the leading timestamp column of a raw CSV data line.
 
-    Files are read newest-first; because both the file names and the rows within
-    each file are chronological, we can stop as soon as we reach a non-empty file
-    with no rows inside the window.
+    The timestamp is the first field and ISO-8601 (no commas), so splitting on
+    the first comma is safe and far cheaper than csv-parsing the whole file.
+    """
+    head = line.split(",", 1)[0]
+    if not head:
+        return None
+    try:
+        return datetime.fromisoformat(head.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def read_history(
+    data_dir: Path,
+    minutes: float = 20.0,
+    max_points: int = DEFAULT_MAX_POINTS,
+) -> list[dict[str, Any]]:
+    """Return decimated rows from the last `minutes`, spanning weekly files.
+
+    Files (and rows within them) are chronological, so we scan newest-first from
+    the *end* of each file and stop as soon as we cross the cutoff. Only the rows
+    inside the window are CSV-parsed, and the result is decimated to at most
+    `max_points` so both the request cost and the payload stay bounded regardless
+    of how large the window or the log files are.
     """
     cutoff = datetime.now(timezone.utc).timestamp() - minutes * 60.0
-    rows: list[dict[str, Any]] = []
+    header: str | None = None
+    kept_lines: list[str] = []  # oldest -> newest across all files
     with _lock:
         for path in reversed(list_csv_files(data_dir)):
-            file_rows = _read_file_rows(path)
-            kept: list[dict[str, Any]] = []
-            for row in file_rows:
-                ts = row.get("timestamp_utc") or ""
-                try:
-                    t = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                except ValueError:
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            lines = text.splitlines()
+            if not lines:
+                continue
+            if header is None:
+                header = lines[0]
+            file_kept: list[str] = []
+            crossed = False
+            for line in reversed(lines[1:]):
+                if not line:
                     continue
-                if t.timestamp() >= cutoff:
-                    kept.append(row)
-            rows = kept + rows
-            if file_rows and not kept:
+                t = _ts_of_line(line)
+                if t is None:
+                    continue
+                if t >= cutoff:
+                    file_kept.append(line)
+                else:
+                    crossed = True
+                    break
+            file_kept.reverse()
+            kept_lines = file_kept + kept_lines
+            if crossed:
                 break
-    return rows
+    if header is None or not kept_lines:
+        return []
+    if max_points and len(kept_lines) > max_points:
+        stride = -(-len(kept_lines) // max_points)  # ceil division
+        kept_lines = kept_lines[::stride]
+    return list(csv.DictReader([header] + kept_lines))
 
 
 def csv_path_for_download(data_dir: Path) -> Path | None:
