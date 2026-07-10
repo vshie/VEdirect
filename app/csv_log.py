@@ -74,6 +74,9 @@ def append_row(data_dir: Path, row: dict[str, Any]) -> None:
 DEFAULT_MAX_POINTS = 1500
 
 
+_TAIL_CHUNK = 1 << 18  # 256 KiB read granularity for the backward scan
+
+
 def _ts_of_line(line: str) -> float | None:
     """Parse the leading timestamp column of a raw CSV data line.
 
@@ -89,6 +92,50 @@ def _ts_of_line(line: str) -> float | None:
         return None
 
 
+def _read_header(path: Path) -> str | None:
+    with path.open("rb") as f:
+        first = f.readline()
+    if not first:
+        return None
+    return first.decode("utf-8", "replace").rstrip("\r\n")
+
+
+def _tail_lines_since(path: Path, cutoff: float) -> tuple[list[str], bool]:
+    """Read a CSV file backward from the end, returning the data lines whose
+    timestamp is >= `cutoff` (oldest-first) and whether we crossed the cutoff.
+
+    Reads only enough 256 KiB chunks from the end to cover the window, so the
+    cost scales with the requested window, not the (ever-growing) file size.
+    """
+    kept: list[str] = []  # newest-first while scanning
+    crossed = False
+    with path.open("rb") as f:
+        f.seek(0, 2)
+        pos = f.tell()
+        remainder = b""  # partial (leading) line carried to the next older chunk
+        while pos > 0 and not crossed:
+            read_size = min(_TAIL_CHUNK, pos)
+            pos -= read_size
+            f.seek(pos)
+            data = f.read(read_size) + remainder
+            parts = data.split(b"\n")
+            remainder = parts[0]  # incomplete until we read the preceding chunk
+            for raw in reversed(parts[1:]):
+                line = raw.decode("utf-8", "replace").rstrip("\r")
+                if not line:
+                    continue
+                t = _ts_of_line(line)
+                if t is None:
+                    continue  # header or malformed
+                if t >= cutoff:
+                    kept.append(line)
+                else:
+                    crossed = True
+                    break
+    kept.reverse()
+    return kept, crossed
+
+
 def read_history(
     data_dir: Path,
     minutes: float = 20.0,
@@ -97,10 +144,11 @@ def read_history(
     """Return decimated rows from the last `minutes`, spanning weekly files.
 
     Files (and rows within them) are chronological, so we scan newest-first from
-    the *end* of each file and stop as soon as we cross the cutoff. Only the rows
-    inside the window are CSV-parsed, and the result is decimated to at most
-    `max_points` so both the request cost and the payload stay bounded regardless
-    of how large the window or the log files are.
+    the *end* of each file and stop as soon as we cross the cutoff. Reads are
+    done backward in chunks so only the window's worth of data is touched, the
+    matched rows are CSV-parsed, and the result is decimated to at most
+    `max_points` so request cost and payload stay bounded regardless of how large
+    the window or the log files grow.
     """
     cutoff = datetime.now(timezone.utc).timestamp() - minutes * 60.0
     header: str | None = None
@@ -108,28 +156,11 @@ def read_history(
     with _lock:
         for path in reversed(list_csv_files(data_dir)):
             try:
-                text = path.read_text(encoding="utf-8")
+                file_kept, crossed = _tail_lines_since(path, cutoff)
             except OSError:
                 continue
-            lines = text.splitlines()
-            if not lines:
-                continue
             if header is None:
-                header = lines[0]
-            file_kept: list[str] = []
-            crossed = False
-            for line in reversed(lines[1:]):
-                if not line:
-                    continue
-                t = _ts_of_line(line)
-                if t is None:
-                    continue
-                if t >= cutoff:
-                    file_kept.append(line)
-                else:
-                    crossed = True
-                    break
-            file_kept.reverse()
+                header = _read_header(path)
             kept_lines = file_kept + kept_lines
             if crossed:
                 break
